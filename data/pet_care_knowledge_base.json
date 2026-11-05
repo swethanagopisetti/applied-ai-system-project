@@ -1,0 +1,50 @@
+[
+  {
+    "document_id": "cat-enrichment-scratching",
+    "source_title": "General Cat Care",
+    "publisher": "ASPCA",
+    "source_url": "https://www.aspca.org/pet-care/cat-care/general-cat-care",
+    "source_section": "Scratching; Cat Supply Checklist",
+    "species": ["cat"],
+    "topics": ["enrichment", "scratching"],
+    "reviewed_on": "2026-11-04",
+    "content_type": "editor-written-summary",
+    "content": "Offer cats appropriate places to scratch, such as a stable scratching post with a rough covering or a scratching pad. Interactive toys are also listed by the ASPCA among basic cat supplies."
+  },
+  {
+    "document_id": "dog-exercise-and-play",
+    "source_title": "General Dog Care",
+    "publisher": "ASPCA",
+    "source_url": "https://www.aspca.org/pet-care/dog-care/general-dog-care",
+    "source_section": "Exercise",
+    "species": ["dog"],
+    "topics": ["enrichment", "exercise", "routine-planning"],
+    "reviewed_on": "2026-11-04",
+    "content_type": "editor-written-summary",
+    "content": "Dogs need exercise for physical activity and mental stimulation. Individual exercise needs vary with factors such as breed or mix, age, and health. The ASPCA notes that supervised play can provide activity and help reduce boredom."
+  },
+  {
+    "document_id": "cat-grooming-basics",
+    "source_title": "Cat Grooming Tips",
+    "publisher": "ASPCA",
+    "source_url": "https://www.aspca.org/pet-care/cat-care/cat-grooming-tips",
+    "source_section": "Skin and Fur Care; Brushing Your Cat",
+    "species": ["cat"],
+    "topics": ["grooming", "routine-planning"],
+    "reviewed_on": "2026-11-04",
+    "content_type": "editor-written-summary",
+    "content": "Regular brushing can remove dirt and loose hair from a cat's coat. The ASPCA suggests one or two brushings per week for many cats, while long-haired indoor cats may need grooming every few days to reduce tangles. If grooming is difficult or risks injury, seek help from a professional groomer or veterinarian."
+  },
+  {
+    "document_id": "dog-grooming-basics",
+    "source_title": "Dog Grooming Tips",
+    "publisher": "ASPCA",
+    "source_url": "https://www.aspca.org/pet-care/dog-care/dog-grooming-tips",
+    "source_section": "Brushing Your Dog",
+    "species": ["dog"],
+    "topics": ["grooming", "routine-planning"],
+    "reviewed_on": "2026-11-04",
+    "content_type": "editor-written-summary",
+    "content": "Brushing helps remove dirt and loose hair and can prevent tangles. How often a dog needs brushing depends on coat type: the ASPCA describes weekly brushing for some short coats and daily attention for some long coats that tangle easily."
+  }
+]

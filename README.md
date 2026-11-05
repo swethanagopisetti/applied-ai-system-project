@@ -97,6 +97,58 @@ tests/test_pawpal.py ........                                                   
 - **One-time tasks:** Completing a one-time task marks it complete without creating another occurrence. Already-completed tasks are not repeated.
 - **Streamlit schedule view:** Shows tasks in time order with pet and completion-status filters, and displays actionable conflict warnings.
 
+## RAG Feature: Phase 1 Scope and Safety
+
+The planned Retrieval-Augmented Generation (RAG) feature will provide general pet-care information grounded in a curated knowledge base. It is an informational aid, not a veterinary service, and it will not change PawPal+'s existing deterministic scheduling behavior.
+
+### In scope
+
+- General, low-risk care information, initially focused on enrichment, grooming basics, and routine planning.
+- Answers grounded in relevant passages from the knowledge base, with visible citations to the source title and link.
+- Species-aware retrieval when the user has selected a pet and the available source material supports that distinction.
+- Optional suggestions that a user can review before adding them as a scheduled task.
+
+### Out of scope and safety behavior
+
+- Diagnosing an illness or injury, assessing symptoms, recommending or changing treatment, and providing medication or dosage instructions.
+- Replacing advice from a veterinarian or presenting generated content as professional medical guidance.
+- For urgent symptoms or possible poisoning, the assistant should not attempt to assess or treat the situation; it should advise contacting a veterinarian or appropriate local emergency animal-care service promptly.
+- If the knowledge base does not contain relevant, sufficiently reliable information, the assistant should say it cannot answer from its sources rather than guess.
+
+Users may still schedule medication or veterinary-care tasks based on instructions they already received from their veterinarian; the RAG assistant must not originate or modify those instructions.
+
+### Source acceptance and maintenance
+
+- Use public material from identifiable veterinary, animal-welfare, or other qualified organizations; do not treat anonymous posts or user-generated discussion as authoritative guidance.
+- Keep each source's title, publisher, URL, species/topic tags when applicable, and review date alongside its content so answers can cite and filter the material.
+- Review material for relevance and safety before adding it. Remove or re-review sources that are outdated, unclear, or inconsistent with other trusted guidance.
+- The initial implementation should use a deliberately curated collection; it should not crawl arbitrary web pages at answer time.
+
+### Phase 1 acceptance criteria
+
+- The feature's permitted topics and explicit exclusions are documented before implementation.
+- Safety and source-quality rules are defined for the knowledge base and answer behavior.
+- Later implementation can be checked against these boundaries: supported claims are cited, unsupported questions receive a limitation, and task suggestions require user confirmation.
+
+## RAG Feature: Phase 2 Knowledge Base
+
+A first curated knowledge base is stored in [`data/pet_care_knowledge_base.json`](./data/pet_care_knowledge_base.json). It contains short, editor-written summaries for cat and dog enrichment and grooming. Each record is a separate document boundary and includes a stable document ID, source title, publisher, URL, source section, species and topic tags, review date, and content type.
+
+The summaries were checked against their linked ASPCA source pages on 2026-11-04. They are paraphrases, not copied source pages. The dataset intentionally excludes diagnosis, treatment, and medication instructions. The URLs are source citations; the app does not fetch or crawl those pages at runtime.
+
+### Phase 2 maintenance rules
+
+- Add only reviewed material from identifiable, qualified organizations, following the source acceptance rules above.
+- Keep each record self-contained and preserve its source metadata when splitting or updating content; use a new document ID if a document's meaning or source changes substantially.
+- Update `reviewed_on` only after a source has been checked again. Re-check the source URL and content before relying on an entry in an answer.
+- Treat the current collection as a small starter set, not as comprehensive pet-care coverage.
+
+## RAG Feature: Phase 3 Retrieval
+
+[`rag_retrieval.py`](./rag_retrieval.py) loads the local JSON knowledge base and exposes `KnowledgeBase.retrieve()`. It ranks documents by lexical overlap between meaningful query terms and each document's content and topic/source metadata, optionally filters by species, applies a relevance cutoff, and returns at most `top_k` passages with their source citations and tags. If no passage meets the cutoff, retrieval returns an empty list so a later answer layer can decline to answer.
+
+The initial retriever is deliberately dependency-free and does not make network or model calls. Lexical matching does not understand synonyms; expand or replace the retrieval method only when evaluation shows this starter approach is insufficient. Run `pytest tests/test_rag_retrieval.py` to validate ranking, species filtering, citations, cutoff behavior, and invalid input handling.
+
 ## Smarter Scheduling
 
 | Feature | Method(s) | Notes |
