@@ -16,6 +16,7 @@ _STOP_WORDS = {
 	"an",
 	"and",
 	"are",
+	"can",
 	"for",
 	"how",
 	"i",
@@ -23,8 +24,10 @@ _STOP_WORDS = {
 	"is",
 	"me",
 	"my",
+	"often",
 	"of",
 	"some",
+	"should",
 	"the",
 	"to",
 	"what",
@@ -151,7 +154,7 @@ class KnowledgeBase:
 			raise ValueError("Species must not be empty when provided.")
 
 		query_tokens = {
-			token
+			_normalize_token(token)
 			for token in _tokens(query)
 			if token not in _STOP_WORDS
 		}
@@ -175,7 +178,9 @@ class KnowledgeBase:
 					" ".join(document.topics),
 				)
 			)
-			matched_tokens = query_tokens.intersection(_tokens(searchable_text))
+			matched_tokens = query_tokens.intersection(
+				_normalize_token(token) for token in _tokens(searchable_text)
+			)
 			relevance = len(matched_tokens) / len(query_tokens)
 			if relevance < min_relevance:
 				continue
@@ -206,3 +211,9 @@ def _is_string_list(value: object) -> bool:
 
 def _tokens(text: str) -> set[str]:
 	return set(_TOKEN_PATTERN.findall(text.casefold()))
+
+
+def _normalize_token(token: str) -> str:
+	if len(token) > 5 and token.endswith("ing"):
+		return token[:-3]
+	return token

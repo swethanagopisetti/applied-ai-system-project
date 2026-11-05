@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import streamlit as st
 import pawpal_system
 from datetime import time
+from anthropic import APIError
+from rag_answer import PetCareAnswer, PetCareAnswerService
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -8,12 +12,8 @@ st.title("🐾 PawPal+")
 
 st.markdown(
     """
-Welcome to the PawPal+ starter app.
-
-This file is intentionally thin. It gives you a working Streamlit app so you can start quickly,
-but **it does not implement the project logic**. Your job is to design the system and build it.
-
-Use this app as your interactive demo once your backend classes/functions exist.
+Plan pet-care tasks and ask questions about general cat and dog care. Answers are
+grounded in PawPal+'s reviewed sources. They are informational only, not veterinary advice.
 """
 )
 
@@ -57,6 +57,80 @@ if not owner.pets:
 pet = owner.pets[0]
 pet.name = pet_name
 pet.species = species
+
+st.divider()
+
+st.subheader("Ask about pet care")
+st.caption(
+    "Ask about general grooming, scratching, or exercise. "
+    "For health concerns or emergencies, contact a veterinarian."
+)
+with st.form("pet_care_question"):
+    pet_care_question = st.text_input(
+        "Your question",
+        placeholder="What are some enrichment ideas for my pet?",
+    )
+    ask_submitted = st.form_submit_button("Ask PawPal+")
+
+if ask_submitted:
+    if not pet_care_question.strip():
+        st.error("Enter a question before submitting.")
+        st.session_state.pop("pet_care_answer", None)
+    else:
+        species_filter = species if species in {"cat", "dog"} else None
+        try:
+            st.session_state["pet_care_answer"] = PetCareAnswerService().answer(
+                pet_care_question,
+                species=species_filter,
+            )
+        except APIError as error:
+            st.session_state.pop("pet_care_answer", None)
+            st.error(f"Could not get an answer from Anthropic: {error}")
+        except RuntimeError as error:
+            st.session_state.pop("pet_care_answer", None)
+            st.error(f"Could not generate an answer: {error}")
+
+pet_care_answer: PetCareAnswer | None = st.session_state.get("pet_care_answer")
+if pet_care_answer is not None:
+    if pet_care_answer.status == "veterinary_referral":
+        st.warning(pet_care_answer.answer)
+    elif pet_care_answer.status == "insufficient_evidence":
+        st.info(pet_care_answer.answer)
+    else:
+        st.markdown(pet_care_answer.answer)
+
+    if pet_care_answer.status == "answered":
+        with st.expander("Optionally add a task based on this guidance"):
+            with st.form("answer_based_task"):
+                suggested_task_description = st.text_input(
+                    "Task description",
+                    placeholder="Describe the care task you want to schedule",
+                    key="answer_based_task_description",
+                )
+                suggested_task_time = st.time_input(
+                    "Task time",
+                    value=time(8, 0),
+                    key="answer_based_task_time",
+                )
+                suggested_task_frequency = st.selectbox(
+                    "Frequency",
+                    ["daily", "weekly", "once"],
+                    key="answer_based_task_frequency",
+                )
+                add_suggested_task = st.form_submit_button("Add task to schedule")
+
+            if add_suggested_task:
+                if not suggested_task_description.strip():
+                    st.error("Enter a task description before adding it.")
+                else:
+                    pet.add_task(
+                        pawpal_system.Task(
+                            description=suggested_task_description.strip(),
+                            time=suggested_task_time,
+                            frequency=suggested_task_frequency,
+                        )
+                    )
+                    st.success("Task added to the schedule.")
 
 st.divider()
 
