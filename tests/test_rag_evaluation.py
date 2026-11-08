@@ -55,3 +55,4 @@ def test_representative_questions_retrieve_and_cite_expected_evidence(
 	assert expected_evidence in answer.answer
 	assert answer.sources[0].url in answer.answer
 	assert "not veterinary advice" in answer.answer
+	assert answer.evidence_match_score == passages[0].relevance

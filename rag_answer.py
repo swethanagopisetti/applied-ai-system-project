@@ -88,6 +88,7 @@ class PetCareAnswer:
 	sources: tuple[AnswerSource, ...] = ()
 	status: str = "answered"
 	needs_veterinarian: bool = False
+	evidence_match_score: float | None = None
 
 
 class PetCareAnswerService:
@@ -209,6 +210,7 @@ class PetCareAnswerService:
 				+ "\n\nThis is general information, not veterinary advice."
 			),
 			sources=sources,
+			evidence_match_score=max(passage.relevance for passage in passages),
 		)
 
 	def _generated_answer(
@@ -290,7 +292,11 @@ class PetCareAnswerService:
 			+ source_list
 			+ "\n\nThis is general information, not veterinary advice."
 		)
-		return PetCareAnswer(answer=answer, sources=sources)
+		return PetCareAnswer(
+			answer=answer,
+			sources=sources,
+			evidence_match_score=max(passage.relevance for passage in passages),
+		)
 
 	@staticmethod
 	def _format_sources(sources: tuple[AnswerSource, ...]) -> str:

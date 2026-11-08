@@ -25,6 +25,8 @@ def test_missing_api_key_uses_local_extractive_answer(monkeypatch) -> None:
 	assert "Offer cats appropriate places to scratch" in result.answer
 	assert result.sources[0].url in result.answer
 	assert "not veterinary advice" in result.answer
+	assert result.evidence_match_score is not None
+	assert 0.0 <= result.evidence_match_score <= 1.0
 	anthropic_factory.assert_not_called()
 
 
@@ -51,6 +53,7 @@ def test_configured_api_key_uses_anthropic_and_cites_retrieved_source(
 	assert "Use a stable scratching post [1]." in result.answer
 	assert result.sources[0].url in result.answer
 	assert "not veterinary advice" in result.answer
+	assert result.evidence_match_score == 1.0
 	anthropic_factory.assert_called_once_with(api_key="test-api-key")
 	request = client.messages.create.call_args.kwargs
 	assert request["model"] == "test-model"
@@ -74,6 +77,7 @@ def test_anthropic_answer_with_invalid_citation_uses_local_grounded_fallback(
 	assert "Offer cats appropriate places to scratch" in result.answer
 	assert "[9]" not in result.answer
 	assert "invalid passage citations" in caplog.text
+	assert result.evidence_match_score is not None
 
 
 def test_species_filter_is_applied_to_answer() -> None:
@@ -104,6 +108,7 @@ def test_unsupported_question_returns_limitation_without_sources() -> None:
 
 	assert result.status == "insufficient_evidence"
 	assert result.sources == ()
+	assert result.evidence_match_score is None
 	assert "can't answer this from PawPal+'s knowledge base" in result.answer
 	client.messages.create.assert_not_called()
 
@@ -123,6 +128,7 @@ def test_medical_questions_are_referred_to_veterinarian(query) -> None:
 	assert result.status == "veterinary_referral"
 	assert result.needs_veterinarian
 	assert result.sources == ()
+	assert result.evidence_match_score is None
 	assert "contact your veterinarian" in result.answer.lower()
 	assert "diagnose" in result.answer.lower()
 	client.messages.create.assert_not_called()

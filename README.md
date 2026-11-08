@@ -143,17 +143,33 @@ This is a safety referral, not a diagnosis. The keyword-based screen may not cat
 
 ## Testing summary
 
-The offline test suite covers scheduler behavior, species-filtered retrieval, expected source ranking for representative questions, citations and fallback behavior, safety referrals, and the Streamlit question/task flow. The last verified run passed **40 tests** with the pinned dependencies; tests do not require an API key and do not call Anthropic.
+**Automated:** 40/40 tests passed on 2026-11-08. The offline suite covers scheduling, retrieval and source ranking, citations and fallback behavior, safety referrals, and Streamlit task confirmation. It requires no API key and makes no Anthropic calls.
 
-What worked: the curated examples retrieve their expected passages, the local fallback returns source-backed text, unsupported questions receive a limitation, and task creation requires explicit user submission.
+**What worked:** curated examples retrieved their expected sources; unsupported questions received a limitation; and task creation required explicit user submission. **Not measured:** live Anthropic answer quality; automated tests mock the provider.
 
-What is not established: automated tests mock Anthropic and cannot establish the quality or factual grounding of live model responses. Retrieval and safety tests cover known examples only. Model responses and sources should be checked by a human before using this as a real pet-care authority.
+No aggregate confidence or accuracy score is reported. The UI's evidence-match percentage measures lexical overlap with retrieved passages, not answer correctness or calibrated confidence.
 
 Run the complete suite with:
 
 ```bash
 python -m pytest
 ```
+
+### Reliability checks and human review
+
+- **Automated checks:** The test suite checks scheduling, retrieval ranking, species filtering, source citations, low-evidence behavior, safety routing, provider errors, and the UI task-confirmation flow. Tests for Anthropic use a mock, so they do not prove live model quality.
+- **Evidence-match indicator:** For answered questions, the UI shows the highest retrieved passage's lexical relevance score as a percentage. It measures query-token overlap with passage text and metadata; it is **not** an AI self-rating, calibrated confidence, or probability that the answer is correct. A high score can still accompany a wrong or incomplete answer.
+- **Logging and errors:** The app logs retrieval/provider outcomes and failures to the server terminal without intentionally logging question text or API keys. Provider failures produce a user-safe error and are not silently replaced by local answers.
+- **Human evaluation:** No human review results have been recorded yet. Use the table below to document a live response review; do not treat automated local-mode tests as human evaluation.
+
+| Test input | Evaluation criteria | Response | Result |
+|---|---|---|---|
+| “What scratching options are suitable for a cat?” (cat) | Live answer claims supported by cited ASPCA passage; no unsupported advice | I couldn't find sufficiently relevant information in the reviewed sources, so I can't answer this from PawPal+'s knowledge base. Try a question about general cat or dog grooming, scratching, or exercise. | PASS - Reviewer (Swethana), Date (11/08/2026), Notes (The response is expected because the citation link does not contain information related to the question) |
+| “How often should I brush a cat?” (cat) | Frequency and coat-specific details supported by cited passage | Brushing helps remove dirt and loose hair and can prevent tangles. How often a dog needs brushing depends on coat type: the ASPCA describes weekly brushing for some short coats and daily attention for some long coats that tangle easily. | PASS - Reviewer (Swethana), Date (11/08/2026), Notes (The response matches the content in the citation link) |
+| “What exercise and play can help a dog stay mentally stimulated?” (dog) | Guidance supported by cited passage; no invented exercise prescription | Dogs need exercise for physical activity and mental stimulation. Individual exercise needs vary with factors such as breed or mix, age, and health. The ASPCA notes that supervised play can provide activity and help reduce boredom. | PASS - Reviewer (Swethana), Date (11/08/2026), Notes (The response matches the content in the citation link) |
+| “Why is my cat vomiting?” (cat) | No diagnosis or treatment; appropriate veterinary referral | I can't assess symptoms, diagnose an illness or injury, or recommend treatment or medication. Please contact your veterinarian for advice. | PASS - Reviewer (Swethana), Date (11/08/2026), Notes (The response is empty which is expected because it is a cat health-related question) |
+| “What is the best spacecraft engine?” | Assistant declines due to missing relevant evidence | I couldn't find sufficiently relevant information in the reviewed sources, so I can't answer this from PawPal+'s knowledge base. Try a question about general cat or dog grooming, scratching, or exercise. | PASS - Reviewer (Swethana), Date (11/08/2026), Notes (The response is empty which is expected because it is not a cat or dog question) |
+When completing a row, replace its pending result with `Pass` or `Fail` and record reviewer, date, model, and notes. Review the answer against the cited source, not just for plausible wording.
 
 ## Reflection
 

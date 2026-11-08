@@ -121,6 +121,13 @@ if pet_care_answer is not None:
         st.info(pet_care_answer.answer)
     else:
         st.markdown(pet_care_answer.answer)
+        if pet_care_answer.evidence_match_score is not None:
+            st.caption(
+                "Best retrieval match: "
+                f"{pet_care_answer.evidence_match_score:.0%}. "
+                "This measures lexical overlap, not factual correctness "
+                "or model confidence."
+            )
 
     if pet_care_answer.status == "answered":
         with st.expander("Optionally add a task based on this guidance"):
