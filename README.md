@@ -28,64 +28,52 @@ Your final app should:
 
 ## Getting started
 
-### Setup
+### Requirements
+
+- Python 3.9.6 is recommended for the exact tested environment.
+- [`requirements.txt`](./requirements.txt) pins the complete resolved Python dependency set, including transitive dependencies.
+- An Anthropic API key is optional. Without one, the app uses local extractive answers from retrieved passages; with one, it uses Anthropic to formulate an answer from those passages.
+
+### Install and run (macOS/Linux)
+
+From the repository root:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+python3 --version
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m pytest
+python -m streamlit run app.py
 ```
 
-### Suggested workflow
+### Install and run (Windows PowerShell)
 
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
-
-## 🖥️ Sample Output
-
-Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
-
-```
-ai110-module2show-pawpal-starter % python3 main.py
-Today's Schedule
-07:30 - Breakfast
-08:00 - Morning walk
-18:00 - Evening feeding
+```powershell
+py -3.9 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m pytest
+python -m streamlit run app.py
 ```
 
-## 🧪 Testing PawPal+
+If PowerShell does not have Python 3.9 installed, use `py -3` for another Python 3.9+ version. The pinned dependencies were verified with Python 3.9.6.
+
+To use Anthropic-generated responses, set the key in the shell before launching Streamlit. Do not put keys in source files or commit them.
 
 ```bash
-# Run the full test suite:
-pytest
-
-# Run with coverage:
-pytest --cov
+# macOS/Linux
+export ANTHROPIC_API_KEY="your-key"
 ```
 
-The tests cover task completion and adding tasks, chronological sorting, filtering by completion status and pet name, daily and weekly recurrence (including date rollover), and conflict detection for duplicate times.
-
-Confidence Level – 5 stars
-
-Sample test output:
-
+```powershell
+# Windows PowerShell
+$env:ANTHROPIC_API_KEY = "your-key"
 ```
-# Paste your pytest output here
-% python3 -m pytest
-======================================================== test session starts =========================================================
-platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
-rootdir: /Users/swe/codepathai110/ai110-module2show-pawpal-starter
-collected 8 items
 
-tests/test_pawpal.py ........                                                                                                  [100%]
+Without the key, no Anthropic network request is made. To run the sample CLI schedule instead of the UI, use `python main.py`. Run tests from the repository root with `python -m pytest`; the suite is offline and does not require an API key or `pytest-cov`.
 
-========================================================= 8 passed in 0.02s ==========================================================
-```
+The app logs its answer path, retrieval outcomes, and provider failures to the Streamlit server's terminal. Set `PAWPAL_LOG_LEVEL` to `DEBUG`, `INFO`, `WARNING`, or `ERROR` to adjust verbosity. Query text and API keys are not intentionally written to application logs. Anthropic errors are logged and shown as a safe, user-facing message; they do not silently switch to local mode.
 
 ## Features
 
@@ -155,7 +143,7 @@ The initial retriever is deliberately dependency-free and does not make network 
 
 Install dependencies with `pip install -r requirements.txt`. When `ANTHROPIC_API_KEY` is set to a non-empty value, the service uses Anthropic; optionally set `ANTHROPIC_MODEL` to an available Anthropic model (default: `claude-sonnet-5-5`). Without a configured key, it falls back to local extractive answers from the retrieved passages and does not make a network call. Never commit API keys. Anthropic provider errors are surfaced rather than silently switching providers. The API receives the user's question and retrieved passage content; do not include sensitive personal information in questions.
 
-The safety routing uses conservative keyword and phrase checks as an initial safeguard, not a complete medical-intent classifier. It cannot guarantee that every medical question will be recognized; this limitation must be addressed before exposing the answer service as a general-purpose assistant. The model instruction is an additional guardrail, not a safety guarantee. Run `pytest tests/test_rag_answer.py` to validate request construction, source grounding, limitations, and safety referrals; tests use a mocked Anthropic client and do not make API calls.
+The safety routing uses conservative keyword and phrase checks as an initial safeguard, not a complete medical-intent classifier. It cannot guarantee that every medical question will be recognized. The model instruction and citation-index check are additional guardrails, not guarantees of factual accuracy. If the model returns missing or out-of-range citation markers, PawPal+ uses the retrieved passages directly instead of displaying the ungrounded response. Run `python -m pytest tests/test_rag_answer.py` to validate request construction, source grounding, limitations, and safety referrals; tests use a mocked Anthropic client and do not make API calls.
 
 ## RAG Feature: Phase 5 PawPal+ Integration
 
@@ -168,6 +156,10 @@ After a supported answer, users can optionally open the task form, enter and rev
 [`tests/test_rag_evaluation.py`](./tests/test_rag_evaluation.py) is a small deterministic evaluation set for cat scratching, cat grooming frequency, dog exercise/play, and dog grooming frequency. Each case checks that the expected document ranks first, the local answer includes the expected evidence, and its citation points to that document's source. These tests run without an Anthropic key or network access. The retrieval layer normalizes a basic `-ing` suffix so common phrasing such as “brush” can match source summaries that use “brushing”; it is still lexical and does not provide general synonym understanding.
 
 Run all unit, retrieval, answer, evaluation, and Streamlit checks with `pytest`. To add an evaluation case, include a natural-language query, species, expected document ID, and a short evidence phrase in `EVALUATION_CASES`; check the curated source before treating the expected phrase as a correctness criterion. These checks cover known examples, not all possible prompts. The Anthropic response remains nondeterministic and needs separate, human-reviewed evaluation with a configured API key before relying on model-generated wording.
+
+## System Diagram
+
+See [`diagrams/rag_system.mmd`](./diagrams/rag_system.mmd) for the RAG request flow, local and Anthropic response paths, safety handling, optional task confirmation, and human and automated evaluation.
 
 ## Smarter Scheduling
 

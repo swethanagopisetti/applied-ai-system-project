@@ -1,0 +1,56 @@
+flowchart TD
+    Human([Pet owner])
+    UI["Streamlit UI<br/>Question + selected species"]
+    Answer["PetCareAnswerService<br/>Input validation + safety screening"]
+    Referral["Veterinary referral"]
+    Retriever["KnowledgeBase<br/>Lexical ranking + species filter"]
+    KB[("Curated knowledge base<br/>data/pet_care_knowledge_base.json")]
+    NoEvidence["Insufficient-evidence response"]
+    Provider{"ANTHROPIC_API_KEY configured?"}
+    Anthropic["Anthropic<br/>Synthesizes answer from question + passages"]
+    CitationCheck{"Citations refer to retrieved passages?"}
+    Local["Local extractive response<br/>Retrieved passages + citations"]
+    Metadata["Attach source citations<br/>from local metadata"]
+    Error["Log provider error<br/>Show safe error; no silent fallback"]
+    Response["Cited answer or safety/coverage notice"]
+    Confirm{"User chooses and confirms<br/>an optional task?"}
+    Scheduler["Existing deterministic scheduler"]
+    Schedule["Updated pet schedule"]
+
+    Human --> UI
+    UI --> Answer
+    Answer -->|"Medical / urgent concern"| Referral
+    Referral --> Response
+    Answer -->|"General-care question"| Retriever
+    Retriever <-->|"Reviewed documents"| KB
+    Retriever -->|"No relevant passages"| NoEvidence
+    NoEvidence --> Response
+    Retriever -->|"Ranked passages + metadata"| Provider
+    Provider -->|"Yes: question + passages"| Anthropic
+    Provider -->|"No"| Local
+    Anthropic --> CitationCheck
+    CitationCheck -->|"Valid citations"| Metadata
+    CitationCheck -->|"Missing or invalid citations"| Local
+    Local --> Metadata
+    Anthropic -->|"API failure"| Error
+    Error --> UI
+    Metadata --> Response
+    Response --> UI
+    UI -->|"Supported guidance"| Human
+    Human --> Confirm
+    Confirm -->|"Yes"| Scheduler
+    Confirm -->|"No"| UI
+    Scheduler --> Schedule
+    Schedule --> UI
+
+    Curator["Human source review<br/>Select, verify, and maintain content"]
+    Curator -->|"Curates / rechecks"| KB
+    ModelReviewer["Human reviewer<br/>Check model wording against cited sources"]
+    Response -.->|"Review generated answer"| ModelReviewer
+    ModelReviewer -.->|"Improve sources or evaluation cases"| Curator
+
+    Tests["Automated pytest suite<br/>Retrieval, answer, safety, and UI tests"]
+    Eval["Phase 6 evaluation cases<br/>Expected document + evidence"]
+    Tests --> Eval
+    Eval -.->|"Check retrieval and local cited evidence"| Retriever
+    Eval -.->|"Mock provider; no live model quality guarantee"| Anthropic

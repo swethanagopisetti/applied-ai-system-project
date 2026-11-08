@@ -4,6 +4,7 @@ from unittest.mock import Mock
 import pytest
 
 import rag_answer
+from anthropic import APIError
 from rag_answer import PetCareAnswerService
 
 
@@ -58,10 +59,32 @@ def test_configured_api_key_uses_anthropic_and_cites_retrieved_source(
 	assert "Offer cats appropriate places to scratch" in request["messages"][0]["content"]
 
 
+def test_anthropic_answer_with_invalid_citation_uses_local_grounded_fallback(
+	monkeypatch,
+	caplog,
+) -> None:
+	monkeypatch.setenv("ANTHROPIC_API_KEY", "test-api-key")
+	client = Mock()
+	client.messages.create.return_value = SimpleNamespace(
+		content=[SimpleNamespace(type="text", text="Use any product you like [9].")]
+	)
+
+	result = PetCareAnswerService(client=client).answer("cat scratching post")
+
+	assert "Offer cats appropriate places to scratch" in result.answer
+	assert "[9]" not in result.answer
+	assert "invalid passage citations" in caplog.text
+
+
 def test_species_filter_is_applied_to_answer() -> None:
 	client = Mock()
 	client.messages.create.return_value = SimpleNamespace(
-		content=[SimpleNamespace(type="text", text="Brush based on coat type [1].")]
+		content=[
+			SimpleNamespace(
+				type="text",
+				text="Brushing frequency depends on coat type [1].",
+			)
+		]
 	)
 	result = PetCareAnswerService(client=client).answer(
 		"grooming routine",
@@ -138,9 +161,16 @@ def test_anthropic_empty_response_raises_explicit_error() -> None:
 		PetCareAnswerService(client=client).answer("cat scratching post")
 
 
-def test_anthropic_api_errors_are_not_silently_suppressed() -> None:
+def test_anthropic_api_errors_are_logged_and_not_silently_suppressed(
+	caplog,
+) -> None:
 	client = Mock()
-	client.messages.create.side_effect = RuntimeError("provider unavailable")
+	client.messages.create.side_effect = APIError(
+		"provider unavailable",
+		request=Mock(),
+		body=None,
+	)
 
-	with pytest.raises(RuntimeError, match="provider unavailable"):
+	with pytest.raises(APIError, match="provider unavailable"):
 		PetCareAnswerService(client=client).answer("cat scratching post")
+	assert "Anthropic request failed" in caplog.text

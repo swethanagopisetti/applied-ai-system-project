@@ -10,7 +10,7 @@ def test_app_answers_locally_and_adds_task_only_after_confirmation(
 	monkeypatch,
 ) -> None:
 	monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-	app = AppTest.from_file(str(APP_PATH)).run()
+	app = AppTest.from_file(str(APP_PATH), default_timeout=10).run()
 
 	app.selectbox[0].select("cat")
 	app.text_input[2].set_value("cat scratching post")
@@ -41,7 +41,7 @@ def test_medical_question_shows_veterinary_referral_without_task_form(
 	monkeypatch,
 ) -> None:
 	monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-	app = AppTest.from_file(str(APP_PATH)).run()
+	app = AppTest.from_file(str(APP_PATH), default_timeout=10).run()
 
 	app.text_input[2].set_value("Why is my cat vomiting?")
 	app.button[0].click().run()

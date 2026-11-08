@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+import logging
+import os
+
 import streamlit as st
 import pawpal_system
 from datetime import time
 from anthropic import APIError
 from rag_answer import PetCareAnswer, PetCareAnswerService
+
+_log_level_name = os.getenv("PAWPAL_LOG_LEVEL", "INFO").upper()
+_log_level = getattr(logging, _log_level_name, logging.INFO)
+logging.basicConfig(
+	level=_log_level if isinstance(_log_level, int) else logging.INFO,
+	format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -85,10 +96,22 @@ if ask_submitted:
             )
         except APIError as error:
             st.session_state.pop("pet_care_answer", None)
-            st.error(f"Could not get an answer from Anthropic: {error}")
+            logger.exception("Anthropic request failed while answering a pet-care question.")
+            st.error(
+                "The answer service is temporarily unavailable. "
+                "Please try again later."
+            )
         except RuntimeError as error:
             st.session_state.pop("pet_care_answer", None)
-            st.error(f"Could not generate an answer: {error}")
+            logger.exception("Pet-care answer generation failed.")
+            st.error("Could not generate an answer. Please try again.")
+        except (OSError, ValueError) as error:
+            st.session_state.pop("pet_care_answer", None)
+            logger.exception("Could not load or process the pet-care knowledge base.")
+            st.error(
+                "Could not process the question. Please check the knowledge-base "
+                "file and try again."
+            )
 
 pet_care_answer: PetCareAnswer | None = st.session_state.get("pet_care_answer")
 if pet_care_answer is not None:
