@@ -45,6 +45,18 @@ def test_irrelevant_query_returns_no_passages() -> None:
 	assert KnowledgeBase().retrieve("spacecraft engine repair") == []
 
 
+@pytest.mark.parametrize(
+	("query", "species"),
+	[
+		("dog walking schedule", "dog"),
+		("cat exercise routine", "cat"),
+		("cat scratching spaceship", "cat"),
+	],
+)
+def test_weak_or_unmatched_evidence_is_filtered(query, species) -> None:
+	assert KnowledgeBase().retrieve(query, species=species) == []
+
+
 def test_retrieval_uses_default_dataset_from_any_working_directory() -> None:
 	assert KNOWLEDGE_BASE_PATH.is_absolute()
 	assert KnowledgeBase().retrieve("dog exercise", species="dog")

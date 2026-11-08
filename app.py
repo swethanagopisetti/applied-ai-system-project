@@ -117,7 +117,7 @@ pet_care_answer: PetCareAnswer | None = st.session_state.get("pet_care_answer")
 if pet_care_answer is not None:
     if pet_care_answer.status == "veterinary_referral":
         st.warning(pet_care_answer.answer)
-    elif pet_care_answer.status == "insufficient_evidence":
+    elif pet_care_answer.status in {"insufficient_evidence", "unsupported_scope"}:
         st.info(pet_care_answer.answer)
     else:
         st.markdown(pet_care_answer.answer)

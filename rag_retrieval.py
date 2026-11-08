@@ -17,21 +17,30 @@ _STOP_WORDS = {
 	"and",
 	"are",
 	"can",
+	"frequency",
 	"for",
+	"help",
 	"how",
 	"i",
+	"ideas",
 	"in",
 	"is",
+	"mentally",
 	"me",
 	"my",
 	"often",
 	"of",
+	"options",
 	"some",
 	"should",
+	"stay",
+	"suitable",
 	"the",
 	"to",
 	"what",
 	"with",
+	"routine",
+	"schedule",
 }
 
 
@@ -135,12 +144,13 @@ class KnowledgeBase:
 		*,
 		species: str | None = None,
 		top_k: int = 3,
-		min_relevance: float = 0.2,
+		min_relevance: float = 0.6,
 	) -> list[RetrievedPassage]:
-		"""Return the best-matching passages, or an empty list if none meet the cutoff.
+		"""Return passages with enough overlap in content and relevant topic tags.
 
-		Relevance is the fraction of meaningful query tokens found in the passage
-		or its searchable metadata. Retrieval is lexical and does not infer synonyms.
+		Content matches count fully; topic-tag matches count three-quarters.
+		Species and source-title metadata do not increase relevance. Matching is
+		lexical and does not infer general synonyms.
 		"""
 		if not query.strip():
 			raise ValueError("Query must not be empty.")
@@ -156,7 +166,7 @@ class KnowledgeBase:
 		query_tokens = {
 			_normalize_token(token)
 			for token in _tokens(query)
-			if token not in _STOP_WORDS
+			if token not in _STOP_WORDS and token not in {"cat", "dog"}
 		}
 		if not query_tokens:
 			raise ValueError("Query must contain at least one meaningful term.")
@@ -169,19 +179,20 @@ class KnowledgeBase:
 			):
 				continue
 
-			searchable_text = " ".join(
-				(
-					document.content,
-					document.source_title,
-					document.source_section,
-					" ".join(document.species),
-					" ".join(document.topics),
-				)
-			)
-			matched_tokens = query_tokens.intersection(
-				_normalize_token(token) for token in _tokens(searchable_text)
-			)
-			relevance = len(matched_tokens) / len(query_tokens)
+			content_tokens = {
+				_normalize_token(token) for token in _tokens(document.content)
+			}
+			topic_tokens = {
+				_normalize_token(token)
+				for token in _tokens(" ".join(document.topics))
+			}
+			content_matches = query_tokens.intersection(content_tokens)
+			topic_matches = query_tokens.intersection(topic_tokens) - content_matches
+			if not (content_matches - {"cat", "dog"} or topic_matches):
+				continue
+			relevance = (
+				len(content_matches) + 0.75 * len(topic_matches)
+			) / len(query_tokens)
 			if relevance < min_relevance:
 				continue
 
@@ -215,5 +226,9 @@ def _tokens(text: str) -> set[str]:
 
 def _normalize_token(token: str) -> str:
 	if len(token) > 5 and token.endswith("ing"):
-		return token[:-3]
+		token = token[:-3]
+	if len(token) > 4 and token.endswith("ies"):
+		return token[:-3] + "y"
+	if len(token) > 4 and token.endswith("s") and not token.endswith("ss"):
+		return token[:-1]
 	return token
