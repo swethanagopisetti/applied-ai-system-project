@@ -24,13 +24,13 @@ Task scheduling is separate from answer generation. The assistant does not autom
 
 ## Reliability testing and what surprised me
 
-The automated suite covers scheduling, retrieval thresholds, bundled and custom multi-source loading, species inference/filtering/mismatch handling, scope refusals, citations, lexical claim support, untrusted passage prompting, local fallback, provider errors, safety responses, and the Streamlit task-confirmation flow. In the latest run, 57 of 57 tests passed without a live Anthropic request. These tests establish behavior for known examples; they do not establish live model answer quality.
+The automated suite covers scheduling, retrieval thresholds, bundled and custom multi-source loading, species inference/filtering/mismatch handling, scope refusals, citations, lexical claim support, untrusted passage prompting, local fallback, provider errors, safety responses, and the Streamlit task-confirmation flow. In the latest run, 58 of 58 tests passed without a live Anthropic request. These tests establish behavior for known examples; they do not establish live model answer quality.
 
 One surprising result was that a cat grooming question could receive dog-specific retrieved content when no species filter was explicitly selected. The service now infers an unambiguous species mentioned in the query and applies that filter, with regression tests for the cat grooming case. A separate per-sentence lexical claim-support check now catches some uncited or weakly supported model outputs. Neither change solves general synonym matching or proves semantic entailment.
 
 The app also has an evidence-match display, but it should not be read as an AI confidence score. No calibrated confidence or aggregate answer-accuracy score has been measured.
 
-The retriever previously searched only the bundled ASPCA summaries. A query such as “snuffle mat enrichment” for a dog returns no passage from that collection. With a reviewed custom JSON document containing those terms, the same lexical retriever can return the added passage and its source metadata. This extends topic coverage without changing the retrieval algorithm; it does not establish that the custom source is accurate or that overall answer quality improved.
+The retriever previously searched only the bundled ASPCA summaries. A query such as “snuffle mat enrichment” for a dog returns no passage from that collection. With a custom JSON document containing those terms, the same lexical retriever can return the added passage and its source metadata. This extends topic coverage without changing the retrieval algorithm; it does not establish that the custom source is accurate or that overall answer quality improved. The current implementation does not fetch external webpages at runtime: external documentation must be reviewed and summarized into the local JSON knowledge base before it can be retrieved.
 
 ## Human evaluation
 

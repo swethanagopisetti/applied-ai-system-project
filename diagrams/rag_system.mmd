@@ -4,11 +4,11 @@ flowchart TD
     Answer["PetCareAnswerService<br/>Input validation + safety screening"]
     Referral["Veterinary referral"]
     Retriever["KnowledgeBase<br/>Lexical ranking + species filter"]
-    KB[("Curated knowledge base<br/>data/pet_care_knowledge_base.json")]
+    KB[("Bundled JSON + optional custom JSON sources<br/>PAWPAL_KNOWLEDGE_BASE_PATHS")]
     NoEvidence["Insufficient-evidence response"]
     Provider{"ANTHROPIC_API_KEY configured?"}
     Anthropic["Anthropic<br/>Synthesizes answer from question + passages"]
-    CitationCheck{"Citations refer to retrieved passages?"}
+    GroundingCheck{"Each sentence cited and lexically supported?"}
     Local["Local extractive response<br/>Retrieved passages + citations"]
     Metadata["Attach source citations<br/>from local metadata"]
     Error["Log provider error<br/>Show safe error; no silent fallback"]
@@ -28,9 +28,9 @@ flowchart TD
     Retriever -->|"Ranked passages + metadata"| Provider
     Provider -->|"Yes: question + passages"| Anthropic
     Provider -->|"No"| Local
-    Anthropic --> CitationCheck
-    CitationCheck -->|"Valid citations"| Metadata
-    CitationCheck -->|"Missing or invalid citations"| Local
+    Anthropic --> GroundingCheck
+    GroundingCheck -->|"Pass"| Metadata
+    GroundingCheck -->|"Fail: missing/weak citation support"| Local
     Local --> Metadata
     Anthropic -->|"API failure"| Error
     Error --> UI
