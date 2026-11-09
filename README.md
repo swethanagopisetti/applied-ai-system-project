@@ -4,7 +4,7 @@
 
 **Original project (Modules 1–3): PawPal+**, a pet-care planning project. Its original goal was to help busy pet owners keep track of their pets' care tasks and organize a daily schedule. The project modeled owners, pets, tasks, and a scheduler; it supports task entry, chronological ordering, filtering, recurring tasks, and schedule-conflict warnings.
 
-This iteration adds a Retrieval-Augmented Generation (RAG) question-answering feature to the Streamlit app. PawPal+ retrieves short, reviewed cat- and dog-care passages, then either sends them to Anthropic to formulate a grounded response or, without an API key, displays the retrieved passages with their citations.
+This iteration adds a Retrieval-Augmented Generation (RAG) question-answering feature to the Streamlit app. PawPal+ retrieves short, reviewed cat- and dog-care passages from its bundled knowledge base and any configured local JSON sources, then either sends them to Anthropic to formulate a grounded response or, without an API key, displays the retrieved passages with their citations.
 
 It matters because pet-care answers should be traceable to sources and should not present unsupported content as veterinary guidance. The scheduler remains deterministic, and the RAG assistant never creates tasks without the owner's confirmation.
 
@@ -23,14 +23,14 @@ It matters because pet-care answers should be traceable to sources and should no
 - Treat user questions and retrieved passages as untrusted input; reject common instruction-override requests and check generated claims for citation and lexical support before accepting them.
 - Let the user optionally confirm a care task based on an answer before adding it to the schedule.
 
-The knowledge base is a small starter collection, not comprehensive pet-care coverage. Scope, prompt-injection, and medical screening use bounded keyword and phrase checks; they cannot recognize every risky or out-of-scope query. The claim-support check is lexical, not proof of semantic entailment.
+The bundled knowledge base is a small starter collection, not comprehensive pet-care coverage. Additional reviewed JSON sources can extend its coverage. Scope, prompt-injection, and medical screening use bounded keyword and phrase checks; they cannot recognize every risky or out-of-scope query. The claim-support check is lexical, not proof of semantic entailment.
 
 ## Architecture overview
 
 The diagram at [`diagrams/rag_system.mmd`](./diagrams/rag_system.mmd) shows the main components and data flow:
 
 1. The owner submits a question and selected species through the Streamlit UI.
-2. `PetCareAnswerService` checks the query for health/safety concerns, species mismatches, and supported topics. `KnowledgeBase` then retrieves and ranks passages from [`data/pet_care_knowledge_base.json`](./data/pet_care_knowledge_base.json), filtering by the selected species or a single species named in the query.
+2. `PetCareAnswerService` checks the query for health/safety concerns, species mismatches, and supported topics. `KnowledgeBase` combines passages from [`data/pet_care_knowledge_base.json`](./data/pet_care_knowledge_base.json) with any configured local JSON sources, then retrieves and ranks them by relevance while filtering by the selected species or a single species named in the query.
 3. If an Anthropic key is configured, the question and retrieved passages are sent to Anthropic for synthesis. The prompt marks both as untrusted data; each generated sentence must cite a retrieved passage and pass a lexical-overlap check or PawPal+ falls back to the retrieved excerpts. Without a key, PawPal+ returns those excerpts directly. Citations are assembled from local source metadata.
 4. The UI shows the answer, a limitation, or a veterinary referral. A suggested schedule task is added only after the owner fills out and submits the task form.
 5. Automated tests check retrieval, answer handling, safety routes, and the UI. Human review is needed to assess source quality and whether model-generated wording is faithful to its citations.
@@ -51,6 +51,7 @@ Key implementation files:
 - Python 3.9.6 is the tested version.
 - [`requirements.txt`](./requirements.txt) pins the full tested dependency set.
 - An Anthropic API key is optional. No key is required for local extractive responses or tests.
+- Optional custom sources are local JSON files; the bundled knowledge base is always loaded alongside them.
 
 ### macOS or Linux
 
@@ -88,6 +89,26 @@ $env:ANTHROPIC_API_KEY = "your-key"
 ```
 
 `ANTHROPIC_MODEL` can optionally select another model available to your account. Without a configured key, the app makes no Anthropic request. To run the sample command-line schedule instead of Streamlit, use `python main.py`.
+
+### Add custom knowledge sources
+
+Create one or more JSON files containing reviewed documents, then set `PAWPAL_KNOWLEDGE_BASE_PATHS` before starting the app. The bundled dataset is always loaded; configured files are appended. A ready-to-run example is [`data/example_custom_pet_care.json`](./data/example_custom_pet_care.json), which contains clearly labeled demonstration-only dog enrichment text.
+
+```bash
+# macOS/Linux, from the repository root
+export PAWPAL_KNOWLEDGE_BASE_PATHS="data/example_custom_pet_care.json"
+```
+
+```powershell
+# Windows PowerShell, from the repository root
+$env:PAWPAL_KNOWLEDGE_BASE_PATHS = "data/example_custom_pet_care.json"
+```
+
+For multiple files, separate paths with the operating system's path-list separator (`:` on macOS/Linux, `;` in Windows PowerShell). Paths may be absolute or relative to the directory where you launch PawPal+.
+
+Each file must contain a JSON array. Every document requires non-empty string fields `document_id`, `source_title`, `publisher`, `source_url`, `source_section`, `reviewed_on`, and `content`; `source_url` must use HTTPS. `species` and `topics` must be arrays of non-empty strings. Document IDs must be unique across the bundled and custom files. See the linked JSON file for a complete example.
+
+The custom example's URL and content are placeholders for demonstrating the data format and retrieval; they are not an external source or veterinary guidance. Before relying on custom data, replace them with an accessible, trusted source and review it for accuracy, licensing, freshness, species, and safety. PawPal+ does not scrape or independently verify custom URLs; it uses the supplied summaries and metadata for retrieval and citations.
 
 The app logs answer routing, retrieval outcomes, and provider failures to the server terminal. Set `PAWPAL_LOG_LEVEL` to `DEBUG`, `INFO`, `WARNING`, or `ERROR` to adjust verbosity. Logs do not intentionally include question text or API keys. Provider failures are logged and surfaced as a user-safe error; they do not silently switch to local mode.
 
@@ -137,16 +158,25 @@ This is a safety referral, not a diagnosis. The keyword-based screen may not cat
 
 ## Design decisions and trade-offs
 
-- **Curated local documents:** Source summaries and metadata are reviewed and stored locally rather than scraped at request time. This makes source citations and updates manageable, but the small knowledge base limits coverage.
+- **Curated local documents:** Source summaries and metadata are reviewed and stored locally rather than scraped at request time. The bundled JSON is combined with optional files configured through `PAWPAL_KNOWLEDGE_BASE_PATHS`, so project owners can add internal or other trusted material without changing the retriever. This improves coverage for exact terms present in those documents, but the owner is responsible for source quality, and the collection can still be incomplete or stale.
 - **Simple lexical retrieval:** The dependency-free retriever filters by selected or query-mentioned species, excludes species and source-title metadata from relevance, weights matching content terms fully and topic tags at 0.75, and requires a minimum relevance of 0.6 by default. It does not generally understand synonyms or user intent, so it may decline paraphrases or return only partially relevant passages.
 - **Optional Anthropic integration:** Anthropic can synthesize a more conversational answer from retrieved evidence. It adds network, account, latency, and cost dependencies. Without a key, the fallback is reliable extractive display—not AI-generated synthesis.
 - **Citations and claim checks:** Source titles and URLs come from retrieved documents, not model-generated URLs. Generated sentences must cite an in-range passage and overlap lexically with it; this heuristic catches some unsupported or uncited claims, but cannot prove semantic entailment or truth.
 - **Deterministic scheduling:** The RAG feature does not alter the scheduler or create tasks automatically. This keeps care-task changes under the owner's control. The scheduler orders fixed task times; it is not a full optimizer for duration, priority, or owner-availability constraints.
 - **Safety screening:** Recognized medical and urgent queries are referred to veterinary care before retrieval or model calls. Scope and injection phrase checks are also bounded keyword safeguards, not comprehensive classifiers; retrieved text is still sent to the model as untrusted input when a request passes the guards.
 
+### Retrieval enhancement: custom local sources
+
+The retriever now searches the bundled ASPCA summaries and any number of additional local JSON files in one knowledge base. The committed [`data/example_custom_pet_care.json`](./data/example_custom_pet_care.json) is a ready-to-load demonstration, with the selected species set to `dog`:
+
+- **Before:** With no custom paths configured, the query “dog enrichment snuffle mat activity” returns no passage because the bundled summaries do not cover snuffle mats.
+- **After:** Configure the example JSON as shown above and ask “dog enrichment snuffle mat activity.” Retrieval finds `example-dog-snuffle-mat` and returns its demonstration passage and source metadata. With Anthropic unset, the answer displays the retrieved excerpt; with Anthropic configured, the source is available for citation.
+
+This is a local, reproducible example of expanded retrieval coverage, not validation of the example content or a general accuracy improvement. The JSON labels the text and URL as demonstration-only; replace them with reviewed, trustworthy material for real use.
+
 ## Testing summary
 
-**Automated:** 55/55 tests passed in the latest run. The offline suite covers scheduling, retrieval and source ranking, species filtering and mismatch handling, scope/safety refusals, citations and unsupported-claim fallback, provider errors, and Streamlit task confirmation. Tests mock Anthropic and make no live model calls.
+**Automated:** 58/58 tests passed in the latest run. The offline suite covers scheduling, bundled and custom-source retrieval, species filtering and mismatch handling, scope/safety refusals, citations and unsupported-claim fallback, provider errors, and Streamlit task confirmation. Tests mock Anthropic and make no live model calls.
 
 **What worked:** curated examples retrieved their expected sources; unsupported questions received a limitation; and task creation required explicit user submission. **Not measured:** live Anthropic answer quality; automated tests mock the provider.
 

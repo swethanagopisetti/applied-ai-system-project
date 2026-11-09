@@ -1,0 +1,13 @@
+[
+  {
+    "document_id": "example-dog-snuffle-mat",
+    "source_title": "PawPal+ Custom-Source Demo",
+    "publisher": "PawPal+ demonstration content",
+    "source_url": "https://example.org/pawpal-custom-source-demo",
+    "source_section": "Snuffle mat enrichment",
+    "species": ["dog"],
+    "topics": ["enrichment", "snuffle mat", "activity"],
+    "reviewed_on": "2026-11-08",
+    "content": "Demonstration summary: A snuffle mat is an enrichment activity where a dog searches for kibble hidden in the mat. Supervise the dog and stop using the mat if it is damaged or being chewed. This sample is illustrative only, not veterinary guidance; verify content against a trusted source before using it for pet care."
+  }
+]

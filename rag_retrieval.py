@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -9,6 +11,7 @@ from pathlib import Path
 KNOWLEDGE_BASE_PATH = (
 	Path(__file__).parent / "data" / "pet_care_knowledge_base.json"
 )
+KNOWLEDGE_BASE_PATHS_ENV = "PAWPAL_KNOWLEDGE_BASE_PATHS"
 
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
 _STOP_WORDS = {
@@ -71,17 +74,34 @@ class RetrievedPassage:
 
 
 class KnowledgeBase:
-	"""Load and lexically retrieve reviewed passages from the local knowledge base."""
+	"""Load and lexically retrieve reviewed passages from local JSON sources."""
 
-	def __init__(self, path: Path = KNOWLEDGE_BASE_PATH) -> None:
-		self._documents = self._load_documents(path)
+	def __init__(self, path: Path | Iterable[Path] | None = None) -> None:
+		if path is None:
+			paths = (KNOWLEDGE_BASE_PATH, *self._configured_extra_paths())
+		elif isinstance(path, Path):
+			paths = (path,)
+		else:
+			paths = tuple(path)
+		if not paths:
+			raise ValueError("At least one knowledge-base JSON path is required.")
+		self._documents = self._load_documents(paths)
 
 	@staticmethod
-	def _load_documents(path: Path) -> tuple[KnowledgeDocument, ...]:
-		raw_documents = json.loads(path.read_text(encoding="utf-8"))
-		if not isinstance(raw_documents, list):
-			raise ValueError("Knowledge base must contain a JSON list of documents.")
+	def _configured_extra_paths() -> tuple[Path, ...]:
+		configured_paths = os.getenv(KNOWLEDGE_BASE_PATHS_ENV, "").strip()
+		if not configured_paths:
+			return ()
+		path_values = configured_paths.split(os.pathsep)
+		if any(not value.strip() for value in path_values):
+			raise ValueError(
+				f"{KNOWLEDGE_BASE_PATHS_ENV} must contain non-empty paths "
+				f"separated by {os.pathsep!r}."
+			)
+		return tuple(Path(value.strip()) for value in path_values)
 
+	@staticmethod
+	def _load_documents(paths: Iterable[Path]) -> tuple[KnowledgeDocument, ...]:
 		documents = []
 		seen_ids = set()
 		required_text_fields = (
@@ -93,48 +113,61 @@ class KnowledgeBase:
 			"reviewed_on",
 			"content",
 		)
-		for index, raw_document in enumerate(raw_documents):
-			if not isinstance(raw_document, dict):
-				raise ValueError(f"Knowledge-base document {index} must be an object.")
-			for field_name in required_text_fields:
-				if not isinstance(raw_document.get(field_name), str) or not raw_document[
-					field_name
-				].strip():
+		for path in paths:
+			raw_documents = json.loads(path.read_text(encoding="utf-8"))
+			if not isinstance(raw_documents, list):
+				raise ValueError(
+					f"Knowledge base {path} must contain a JSON list of documents."
+				)
+
+			for index, raw_document in enumerate(raw_documents):
+				if not isinstance(raw_document, dict):
 					raise ValueError(
-						f"Knowledge-base document {index} requires non-empty "
-						f"text field {field_name!r}."
+						f"Knowledge-base document {index} in {path} must be an object."
+					)
+				for field_name in required_text_fields:
+					if (
+						not isinstance(raw_document.get(field_name), str)
+						or not raw_document[field_name].strip()
+					):
+						raise ValueError(
+							f"Knowledge-base document {index} in {path} requires "
+							f"non-empty text field {field_name!r}."
+						)
+
+				document_id = raw_document["document_id"]
+				if document_id in seen_ids:
+					raise ValueError(
+						f"Duplicate knowledge-base document ID: {document_id}"
+					)
+				seen_ids.add(document_id)
+
+				species = raw_document.get("species")
+				topics = raw_document.get("topics")
+				if not _is_string_list(species) or not _is_string_list(topics):
+					raise ValueError(
+						f"Knowledge-base document {index} in {path} must have string "
+						"lists for 'species' and 'topics'."
+					)
+				if not raw_document["source_url"].startswith("https://"):
+					raise ValueError(
+						f"Knowledge-base document {index} in {path} must use an "
+						"HTTPS source URL."
 					)
 
-			document_id = raw_document["document_id"]
-			if document_id in seen_ids:
-				raise ValueError(f"Duplicate knowledge-base document ID: {document_id}")
-			seen_ids.add(document_id)
-
-			species = raw_document.get("species")
-			topics = raw_document.get("topics")
-			if not _is_string_list(species) or not _is_string_list(topics):
-				raise ValueError(
-					f"Knowledge-base document {index} must have string lists for "
-					"'species' and 'topics'."
+				documents.append(
+					KnowledgeDocument(
+						document_id=document_id,
+						source_title=raw_document["source_title"],
+						publisher=raw_document["publisher"],
+						source_url=raw_document["source_url"],
+						source_section=raw_document["source_section"],
+						species=tuple(value.casefold() for value in species),
+						topics=tuple(topics),
+						reviewed_on=raw_document["reviewed_on"],
+						content=raw_document["content"],
+					)
 				)
-			if not raw_document["source_url"].startswith("https://"):
-				raise ValueError(
-					f"Knowledge-base document {index} must use an HTTPS source URL."
-				)
-
-			documents.append(
-				KnowledgeDocument(
-					document_id=document_id,
-					source_title=raw_document["source_title"],
-					publisher=raw_document["publisher"],
-					source_url=raw_document["source_url"],
-					source_section=raw_document["source_section"],
-					species=tuple(value.casefold() for value in species),
-					topics=tuple(topics),
-					reviewed_on=raw_document["reviewed_on"],
-					content=raw_document["content"],
-				)
-			)
 
 		return tuple(documents)
 

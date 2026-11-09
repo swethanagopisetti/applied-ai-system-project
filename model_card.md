@@ -6,7 +6,7 @@ PawPal+ is a pet-care task planner with an optional retrieval-augmented question
 
 ## Limitations and potential biases
 
-- The knowledge base is a small starter set of four paraphrased ASPCA passages about cat and dog grooming, scratching, exercise, and play. It is not comprehensive and represents only the sources and topics selected for it.
+- The bundled knowledge base is a small starter set of four paraphrased ASPCA passages about cat and dog grooming, scratching, exercise, and play. Owners can append multiple custom JSON sources through `PAWPAL_KNOWLEDGE_BASE_PATHS`; custom coverage improves retrieval only for material actually present in those files. PawPal+ does not verify custom sources, so inaccurate, stale, biased, or unsafe summaries can affect retrieval and answers.
 - Retrieval is lexical, not semantic. A minimum weighted relevance of 0.6 filters weak matches, with content tokens weighted fully and topic tags at 0.75. Species mentioned in the query are used as a filter when no species is selected; mixed-species questions and selected/query mismatches are declined. Synonyms and differently phrased questions may still be declined or retrieve incomplete passages.
 - The displayed evidence-match percentage reflects lexical overlap with the top retrieved passage. It is not calibrated confidence, factual accuracy, or a probability that the answer is correct.
 - Anthropic may produce unsupported or incomplete statements despite the prompt and checks. Each generated sentence must cite an in-range retrieved passage and pass a lexical-overlap check; a failed check falls back to local excerpts. Lexical overlap is only a heuristic and cannot prove that a claim is entailed by a source.
@@ -24,11 +24,13 @@ Task scheduling is separate from answer generation. The assistant does not autom
 
 ## Reliability testing and what surprised me
 
-The automated suite covers scheduling, retrieval thresholds, species inference/filtering/mismatch handling, scope refusals, citations, lexical claim support, untrusted passage prompting, local fallback, provider errors, safety responses, and the Streamlit task-confirmation flow. In the latest run, 55 of 55 tests passed without a live Anthropic request. These tests establish behavior for known examples; they do not establish live model answer quality.
+The automated suite covers scheduling, retrieval thresholds, bundled and custom multi-source loading, species inference/filtering/mismatch handling, scope refusals, citations, lexical claim support, untrusted passage prompting, local fallback, provider errors, safety responses, and the Streamlit task-confirmation flow. In the latest run, 57 of 57 tests passed without a live Anthropic request. These tests establish behavior for known examples; they do not establish live model answer quality.
 
 One surprising result was that a cat grooming question could receive dog-specific retrieved content when no species filter was explicitly selected. The service now infers an unambiguous species mentioned in the query and applies that filter, with regression tests for the cat grooming case. A separate per-sentence lexical claim-support check now catches some uncited or weakly supported model outputs. Neither change solves general synonym matching or proves semantic entailment.
 
 The app also has an evidence-match display, but it should not be read as an AI confidence score. No calibrated confidence or aggregate answer-accuracy score has been measured.
+
+The retriever previously searched only the bundled ASPCA summaries. A query such as “snuffle mat enrichment” for a dog returns no passage from that collection. With a reviewed custom JSON document containing those terms, the same lexical retriever can return the added passage and its source metadata. This extends topic coverage without changing the retrieval algorithm; it does not establish that the custom source is accurate or that overall answer quality improved.
 
 ## Human evaluation
 
