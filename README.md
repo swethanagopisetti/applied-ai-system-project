@@ -174,6 +174,117 @@ The retriever now searches the bundled ASPCA summaries and any number of additio
 
 This is a local, reproducible example of expanded retrieval coverage, not validation of the example content or a general accuracy improvement. The JSON labels the text and URL as demonstration-only; replace them with reviewed, trustworthy material for real use.
 
+## Reproducible execution evidence
+
+The following commands run the answer service directly from the repository root. They unset the Anthropic key to make outputs deterministic and local; no API call is made. The command inputs include the selected species, which matters because questions that conflict with it are declined.
+
+### Local answers and guardrail behavior
+
+**Command:**
+
+```bash
+env -u ANTHROPIC_API_KEY -u PAWPAL_KNOWLEDGE_BASE_PATHS python3 - <<'PY'
+from rag_answer import PetCareAnswerService
+
+service = PetCareAnswerService()
+cases = [
+    ("What scratching options are suitable for a cat?", "cat"),
+    ("Why is my cat vomiting?", "cat"),
+    ("What is the best spacecraft engine?", None),
+    ("How often should I brush a cat?", "dog"),
+]
+for query, species in cases:
+    result = service.answer(query, species=species)
+    print(f"INPUT: {query} | selected species: {species or 'none'}")
+    print(f"STATUS: {result.status}")
+    if result.sources:
+        print(f"ANSWER: {result.answer.splitlines()[2]}")
+        print(f"SOURCE: {result.sources[0].title} — {result.sources[0].publisher}")
+    else:
+        print(f"ANSWER: {result.answer}")
+    print()
+PY
+```
+
+**Observed output:**
+
+```text
+INPUT: What scratching options are suitable for a cat? | selected species: cat
+STATUS: answered
+ANSWER: Offer cats appropriate places to scratch, such as a stable scratching post with a rough covering or a scratching pad. Interactive toys are also listed by the ASPCA among basic cat supplies. [1]
+SOURCE: General Cat Care — ASPCA
+
+INPUT: Why is my cat vomiting? | selected species: cat
+STATUS: veterinary_referral
+ANSWER: I can't assess symptoms, diagnose an illness or injury, or recommend treatment or medication. Please contact your veterinarian for advice.
+
+INPUT: What is the best spacecraft engine? | selected species: none
+STATUS: unsupported_scope
+ANSWER: I can help only with general cat or dog grooming, scratching, enrichment, exercise, and play questions covered by the reviewed sources.
+
+INPUT: How often should I brush a cat? | selected species: dog
+STATUS: unsupported_scope
+ANSWER: The question mentions a different or multiple species than the selected pet. Ask about one supported species at a time.
+```
+
+The health query is routed to a veterinary referral before retrieval or a model call; the unrelated query is declined by the scope guard; and the cat question is declined because the selected species is dog. Use `species="cat"` for the brushing query to retrieve cat-specific material. The referral also emits a warning log on stderr.
+
+### Custom-source retrieval
+
+**Command and input:**
+
+```bash
+ANTHROPIC_API_KEY= PAWPAL_KNOWLEDGE_BASE_PATHS=data/example_custom_pet_care.json python3 - <<'PY'
+from rag_answer import PetCareAnswerService
+
+result = PetCareAnswerService().answer(
+    "dog enrichment snuffle mat activity",
+    species="dog",
+)
+print(f"STATUS: {result.status}")
+print(f"ANSWER: {result.answer.splitlines()[2]}")
+print(f"SOURCE: {result.sources[0].title} — {result.sources[0].publisher}")
+print(f"CITATION URL: {result.sources[0].url}")
+PY
+```
+
+**Observed output:**
+
+```text
+STATUS: answered
+ANSWER: Demonstration summary: A snuffle mat is an enrichment activity where a dog searches for kibble hidden in the mat. Supervise the dog and stop using the mat if it is damaged or being chewed. This sample is illustrative only, not veterinary guidance; verify content against a trusted source before using it for pet care. [1]
+SOURCE: PawPal+ Custom-Source Demo — PawPal+ demonstration content
+CITATION URL: https://example.org/pawpal-custom-source-demo
+```
+
+The custom source is demonstration-only. Replace it with accurate, reviewed material before relying on any custom knowledge.
+
+### Automated reliability checks
+
+**Command:**
+
+```bash
+python3 -m pytest -q
+```
+
+**Observed result:**
+
+```text
+..........................................................               [100%]
+58 passed
+```
+
+| Check | Expected behavior | Test evidence |
+|---|---|---|
+| Recognized health or urgent query | Veterinary referral; no answer-provider call | `tests/test_rag_answer.py` |
+| Out-of-scope query | Decline without sources or model call | `tests/test_rag_answer.py` |
+| Selected species conflicts with question | Decline rather than retrieve another species' guidance | `tests/test_rag_answer.py` |
+| Weak or missing evidence | Insufficient-evidence response | `tests/test_rag_retrieval.py`, `tests/test_rag_evaluation.py` |
+| Custom JSON source | Retrieve its passage and preserve source metadata | `tests/test_rag_retrieval.py` |
+| Model answer lacks valid citation/support | Use local extractive passages | `tests/test_rag_answer.py` |
+
+These are reproducible checks for known cases, not proof that keyword screening catches every health or prompt-injection attempt. Anthropic is mocked in automated tests; live model quality was not measured.
+
 ## Testing summary
 
 **Automated:** 58/58 tests passed in the latest run. The offline suite covers scheduling, bundled and custom-source retrieval, species filtering and mismatch handling, scope/safety refusals, citations and unsupported-claim fallback, provider errors, and Streamlit task confirmation. Tests mock Anthropic and make no live model calls.
